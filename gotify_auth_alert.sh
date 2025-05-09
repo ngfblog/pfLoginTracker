@@ -11,15 +11,43 @@ GOTIFY_TOKEN="YourGotifyApplicationToken"       # Your application token
 # Get authentication details from system
 USERNAME="$1"
 IP_ADDRESS="$2"
-EVENT_TYPE="$3"  # For example: "Authentication Success" or "Authentication Failure"
+EVENT_TYPE="$3"  # Authentication Success/Failure, SSHGuard Block/Release
+SERVICE="$4"     # Service type for SSHGuard (sshd, ftpd, etc.)
 HOSTNAME=$(hostname)
 
 # Build message
 TITLE="Security Alert from $HOSTNAME"
-MESSAGE="Event: $EVENT_TYPE
+
+# Customize message based on event type
+if [ "$EVENT_TYPE" = "SSHGuard Block" ]; then
+    MESSAGE="Event: $EVENT_TYPE
+Service: $SERVICE
+IP Address: $IP_ADDRESS
+Action: Blocked by SSHGuard
+Time: $(date)"
+    PRIORITY=7  # Higher priority for blocks
+
+elif [ "$EVENT_TYPE" = "SSHGuard Release" ]; then
+    MESSAGE="Event: $EVENT_TYPE
+IP Address: $IP_ADDRESS
+Action: Released from block by SSHGuard
+Time: $(date)"
+    PRIORITY=4  # Lower priority for releases
+
+else
+    # Standard auth success/failure
+    MESSAGE="Event: $EVENT_TYPE
 User: $USERNAME
 IP Address: $IP_ADDRESS
 Time: $(date)"
+    
+    # Higher priority for failures
+    if [ "$EVENT_TYPE" = "Authentication Failure" ]; then
+        PRIORITY=6
+    else
+        PRIORITY=5
+    fi
+fi
 
 # 1. Send notification to Gotify
 FULL_URL="$GOTIFY_SERVER/message?token=$GOTIFY_TOKEN"
@@ -28,7 +56,7 @@ logger -t pfsense_auth_alert "Attempting to send to Gotify: $FULL_URL"
 RESPONSE=$(curl -X POST \
   -F "title=$TITLE" \
   -F "message=$MESSAGE" \
-  -F "priority=5" \
+  -F "priority=$PRIORITY" \
   --write-out "%{http_code}" \
   --silent \
   --output /tmp/gotify_response \
@@ -63,16 +91,30 @@ $username = $argv[2];
 $ip_address = $argv[3];
 $hostname = $argv[4];
 $time = $argv[5];
+$service = isset($argv[6]) ? $argv[6] : "N/A";
 
 $message = "Event Type: {$event_type}\n";
-$message .= "User: {$username}\n";
-$message .= "IP Address: {$ip_address}\n";
+
+// Customize message based on event type
+if (strpos($event_type, "SSHGuard") !== false) {
+    $message .= "Service: {$service}\n";
+    $message .= "IP Address: {$ip_address}\n";
+    if ($event_type == "SSHGuard Block") {
+        $message .= "Action: Blocked by SSHGuard\n";
+    } else {
+        $message .= "Action: Released from block by SSHGuard\n";
+    }
+} else {
+    $message .= "User: {$username}\n";
+    $message .= "IP Address: {$ip_address}\n";
+}
+
 $message .= "System: {$hostname}\n";
 $message .= "Time: {$time}\n";
 $message .= "\nThis notification was generated automatically by the authentication monitoring system.";
 
 // Create unique ID for notification
-$id = "AuthAlert_" . time();
+$id = "SecurityAlert_" . time();
 $subject = "SECURITY ALERT: {$event_type} on {$hostname}";
 
 // Send notification (will use configured SMTP settings)
@@ -85,7 +127,7 @@ if ($error) {
 
 // Also add to notification system
 notify_via_smtp($id, $subject, $message);
-file_notice($id, $subject, $message, "Authentication Alert");
+file_notice($id, $subject, $message, "Security Alert");
 ?>
 EOF
 
@@ -94,7 +136,7 @@ chmod +x "$PHP_SCRIPT"
 
 # Run the PHP script with the authentication details
 logger -t pfsense_auth_alert "Attempting to send email via pfSense notification system"
-/usr/local/bin/php "$PHP_SCRIPT" "$EVENT_TYPE" "$USERNAME" "$IP_ADDRESS" "$HOSTNAME" "$(date)" >/dev/null 2>&1
+/usr/local/bin/php "$PHP_SCRIPT" "$EVENT_TYPE" "$USERNAME" "$IP_ADDRESS" "$HOSTNAME" "$(date)" "$SERVICE" >/dev/null 2>&1
 
 # Check if the script executed successfully
 if [ $? -eq 0 ]; then
