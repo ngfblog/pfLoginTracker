@@ -1,19 +1,22 @@
 # pfSense Authentication Monitoring System
 
-A lightweight system for monitoring authentication events on pfSense firewalls with email and Gotify notifications.
+A lightweight system for monitoring authentication events on pfSense firewalls with email and Gotify notifications, including SSH connections and SSHGuard blocking events.
 
 ## Overview
 
 This project provides two shell scripts that work together to:
 
 1. Monitor the pfSense authentication log file (`/var/log/auth.log`) for successful and failed login attempts
-2. Send notifications via:
+2. Track SSH connections and SSHGuard blocking activities
+3. Send notifications via:
    - Email (using pfSense's built-in notification system)
    - [Gotify](https://gotify.net/) push notifications
 
 ## Features
 
 - Track successful and failed login attempts
+- Monitor SSH connections to your pfSense system
+- Receive alerts when SSHGuard blocks suspicious IP addresses
 - Send email notifications using your pfSense SMTP settings
 - Send push notifications via Gotify
 - Keep track of processed log entries to avoid duplicate notifications
@@ -81,9 +84,22 @@ System > Advanced > Notifications > E-Mail
 ## How It Works
 
 1. `check_pfsense_login.sh` scans the auth.log file for new entries since the last check
-2. When it finds a login event (success or failure), it extracts the username and IP address
-3. It calls `gotify_auth_alert.sh` with these details
-4. `gotify_auth_alert.sh` sends notifications to both Gotify and email
+2. The script detects different types of events:
+   - Standard authentication successes and failures
+   - SSH connection attempts
+   - SSHGuard blocking actions
+3. When it finds an event, it extracts the relevant information (username, IP address)
+4. It calls `gotify_auth_alert.sh` with these details
+5. `gotify_auth_alert.sh` sends notifications to both Gotify and email
+
+## Alert Types
+
+The system now monitors and alerts on:
+
+- **Authentication Success**: Successful logins to the pfSense web interface
+- **Authentication Failure**: Failed login attempts to the pfSense web interface
+- **SSH Connection**: When someone connects to your pfSense system via SSH
+- **SSHGuard Block**: When SSHGuard detects and blocks suspicious IP addresses
 
 ## Customizing
 
