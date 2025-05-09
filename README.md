@@ -109,3 +109,7 @@ MIT License - See LICENSE file for details.
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 🧡 Like it?
+
+Give the project a ⭐ on GitHub and spread the word!
